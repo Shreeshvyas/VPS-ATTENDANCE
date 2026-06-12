@@ -102,3 +102,22 @@ We have completed the implementation of the Clock-Out system, multi-request acti
 4. **Zero-Setup Database Migrations**:
    - Configured the FastAPI server to run automatic schema alterations on start. Connecting a new database (like PostgreSQL on Render) automatically builds the columns and tables on boot, ready to log in immediately.
 
+---
+
+## Production AWS & Custom Domain Deployment
+
+We have successfully migrated the production environment to **AWS Cloud Infrastructure** under your custom domain.
+
+### Production Environment Details:
+- **Custom Domain**: [vyaspublicschool.in](https://vyaspublicschool.in) (Redirects `www` to root)
+- **Static IPv4 Address**: `3.105.34.13` (AWS Elastic IP)
+- **Host Infrastructure**: AWS EC2 Instance running Ubuntu Linux with Python 3.14.
+- **Relational Database**: Local PostgreSQL database (`vps_attendance`) connected securely via **Psycopg 3** driver.
+- **Process Manager**: Systemd service running Gunicorn/Uvicorn background workers.
+- **Web Server**: Nginx configured as a reverse proxy, translating external secure traffic to FastAPI.
+- **SSL Certificate**: Let's Encrypt (HTTPS) auto-configured via Certbot.
+
+### Automated Installer Script:
+An automated installation script [deploy_aws.sh](file:///e:/VPS%20ATTENDANCE/deploy_aws.sh) was checked into the repository. It performs the complete dependency installations, database seeding, service creation, Nginx configuration, and firewall settings in a single command on any fresh Ubuntu server.
+
+

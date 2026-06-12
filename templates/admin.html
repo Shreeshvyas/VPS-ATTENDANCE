@@ -1,0 +1,569 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Control Center - VPS Attendance{% endblock %}
+
+{% block extra_head %}
+<!-- Include QRCode JS library from CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+    /* Expand app container to full dashboard layout width */
+    .app-container {
+        max-width: 1600px;
+    }
+    .content-wrapper {
+        justify-content: flex-start;
+        align-items: stretch;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="admin-layout">
+    
+    <!-- Sidebar Navigation -->
+    <aside class="admin-sidebar">
+        <div class="admin-profile">
+            <div class="admin-avatar">A</div>
+            <div class="admin-details">
+                <h4>{{ admin_username }}</h4>
+                <span>Administrator</span>
+            </div>
+        </div>
+        
+        <ul class="sidebar-menu">
+            <li class="menu-item active" id="menu-logs" onclick="switchTab('logs')">
+                <button><i class="fa-solid fa-list-check"></i> Today's Logs</button>
+            </li>
+            <li class="menu-item" id="menu-teachers" onclick="switchTab('teachers')">
+                <button><i class="fa-solid fa-chalkboard-user"></i> Teachers Directory</button>
+            </li>
+            <li class="menu-item" id="menu-leaves" onclick="switchTab('leaves')">
+                <button><i class="fa-solid fa-calendar-minus"></i> Leave Manager</button>
+            </li>
+            <li class="menu-item" id="menu-reports" onclick="switchTab('reports')">
+                <button><i class="fa-solid fa-chart-line"></i> Monthly Reports</button>
+            </li>
+            <li class="menu-item" id="menu-settings" onclick="switchTab('settings')">
+                <button><i class="fa-solid fa-sliders"></i> School Settings</button>
+            </li>
+            <li class="menu-item" style="margin-top: 30px; border-top: 1px solid var(--border-color); padding-top: 15px;">
+                <a href="/admin/logout" style="text-decoration: none;">
+                    <button style="color: var(--accent-danger);"><i class="fa-solid fa-power-off"></i> Logout</button>
+                </a>
+            </li>
+        </ul>
+    </aside>
+
+    <!-- Main Dashboard Section -->
+    <section class="admin-main">
+        
+        <!-- Dashboard Header -->
+        <div class="dashboard-header">
+            <div class="dashboard-title">
+                <h2 id="page-title">Today's Attendance</h2>
+                <p id="page-subtitle">Logs for {{ current_date }}</p>
+            </div>
+            
+            <div class="actions-bar">
+                <a href="/qr-display" target="_blank" class="btn btn-secondary" style="padding: 10px 16px; font-size: 0.9rem;">
+                    <i class="fa-solid fa-display" style="margin-right: 8px;"></i> Open QR Display
+                </a>
+                <button onclick="openModal('add-teacher-modal')" id="add-teacher-btn" class="btn" style="padding: 10px 16px; font-size: 0.9rem; display: none;">
+                    <i class="fa-solid fa-plus" style="margin-right: 8px;"></i> Add Teacher
+                </button>
+            </div>
+        </div>
+
+        <!-- Metrics Cards Grid -->
+        <div class="metrics-grid" id="dashboard-metrics">
+            <div class="metric-card">
+                <div class="metric-icon present"><i class="fa-solid fa-user-check"></i></div>
+                <div class="metric-info">
+                    <h5>Present</h5>
+                    <div class="metric-value" id="count-present">{{ metrics.present }}</div>
+                </div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-icon late"><i class="fa-solid fa-user-clock"></i></div>
+                <div class="metric-info">
+                    <h5>Late</h5>
+                    <div class="metric-value" id="count-late">{{ metrics.late }}</div>
+                </div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-icon absent"><i class="fa-solid fa-user-slash"></i></div>
+                <div class="metric-info">
+                    <h5>Absent</h5>
+                    <div class="metric-value" id="count-absent">{{ metrics.absent }}</div>
+                </div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-icon leave"><i class="fa-solid fa-plane-departure"></i></div>
+                <div class="metric-info">
+                    <h5>On Leave</h5>
+                    <div class="metric-value" id="count-leave">{{ metrics.leave }}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== TAB: LOGS ========================================== -->
+        <div class="tab-content active" id="tab-logs">
+            <div class="panel-card">
+                <div class="panel-header">
+                    <span class="panel-title">Attendance Logs</span>
+                    <button onclick="openModal('force-checkin-modal')" class="btn btn-secondary" style="width: auto; padding: 6px 12px; font-size: 0.85rem;">
+                        <i class="fa-solid fa-pen-to-square"></i> Manual Check-In
+                    </button>
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="custom-table">
+                        <thead>
+                            <tr>
+                                <th>Emp Code</th>
+                                <th>Teacher Name</th>
+                                <th>Check-in Time</th>
+                                <th>Distance</th>
+                                <th>Status</th>
+                                <th>Security Flag</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logs-table-body">
+                            {% for log in logs %}
+                            <tr>
+                                <td><strong>{{ log.employee_code }}</strong></td>
+                                <td>{{ log.name }}</td>
+                                <td>{{ log.check_in_time or '--' }}</td>
+                                <td>
+                                    {% if log.distance_meters is not none %}
+                                        {{ log.distance_meters|round|int }}m
+                                    {% else %}
+                                        --
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge badge-{{ log.status|lower }}">
+                                        {{ log.status }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if log.flagged %}
+                                        <span class="badge badge-flagged" title="{{ log.flag_reason }}">
+                                            <i class="fa-solid fa-circle-exclamation"></i> Flagged
+                                        </span>
+                                    {% else %}
+                                        <span class="badge badge-present" style="background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.15);">
+                                            <i class="fa-solid fa-shield-halved"></i> Verified
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="table-actions">
+                                        <button onclick="forceAbsent('{{ log.teacher_id }}')" class="btn-icon reject" title="Mark Absent">
+                                            <i class="fa-solid fa-user-xmark"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== TAB: TEACHERS ========================================== -->
+        <div class="tab-content" id="tab-teachers">
+            <div class="panel-card">
+                <div class="panel-header">
+                    <span class="panel-title">Teachers Directory</span>
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="custom-table">
+                        <thead>
+                            <tr>
+                                <th>Emp Code</th>
+                                <th>Full Name</th>
+                                <th>Phone</th>
+                                <th>Device Link</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="teachers-table-body">
+                            {% for teacher in teachers %}
+                            <tr>
+                                <td><strong>{{ teacher.employee_code }}</strong></td>
+                                <td>{{ teacher.name }}</td>
+                                <td>{{ teacher.phone or '--' }}</td>
+                                <td id="device-cell-{{ teacher.id }}">
+                                    {% if teacher.device_fingerprint %}
+                                        <span style="font-family: monospace; font-size: 0.8rem; color: var(--accent-secondary);" title="{{ teacher.device_fingerprint }}">
+                                            Linked <i class="fa-solid fa-lock"></i>
+                                        </span>
+                                    {% else %}
+                                        <span style="color: var(--text-muted); font-size: 0.85rem;">
+                                            No device linked
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge badge-{{ 'present' if teacher.is_active else 'absent' }}">
+                                        {{ 'Active' if teacher.is_active else 'Inactive' }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="table-actions">
+                                        {% if teacher.device_fingerprint %}
+                                        <button onclick="resetDevice('{{ teacher.id }}')" class="btn-icon" style="color: var(--accent-warning);" title="Reset Device Lock">
+                                            <i class="fa-solid fa-mobile-retro"></i>
+                                        </button>
+                                        {% endif %}
+                                        <button onclick="editTeacher('{{ teacher.id }}', '{{ teacher.name }}', '{{ teacher.employee_code }}', '{{ teacher.phone or '' }}', {{ 'true' if teacher.is_active else 'false' }})" class="btn-icon" title="Edit Teacher">
+                                            <i class="fa-solid fa-user-pen"></i>
+                                        </button>
+                                        <button onclick="deleteTeacher('{{ teacher.id }}')" class="btn-icon reject" title="Delete Record">
+                                            <i class="fa-solid fa-trash-can"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== TAB: LEAVES ========================================== -->
+        <div class="tab-content" id="tab-leaves">
+            <div class="panel-card">
+                <div class="panel-header">
+                    <span class="panel-title">Leave Applications</span>
+                    <button onclick="openModal('add-leave-modal')" class="btn btn-secondary" style="width: auto; padding: 6px 12px; font-size: 0.85rem;">
+                        <i class="fa-solid fa-plus"></i> Request Leave
+                    </button>
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="custom-table">
+                        <thead>
+                            <tr>
+                                <th>Teacher</th>
+                                <th>Type</th>
+                                <th>Start Date</th>
+                                <th>End Date</th>
+                                <th>Reason</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leaves-table-body">
+                            {% for leave in leaves %}
+                            <tr>
+                                <td><strong>{{ leave.teacher_name }}</strong></td>
+                                <td>{{ leave.leave_type }}</td>
+                                <td>{{ leave.start_date }}</td>
+                                <td>{{ leave.end_date }}</td>
+                                <td><span style="font-size: 0.9rem; font-style: italic; color: var(--text-secondary);">{{ leave.reason or '--' }}</span></td>
+                                <td>
+                                    <span class="badge badge-{{ leave.status|lower }}">
+                                        {{ leave.status }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="table-actions">
+                                        {% if leave.status == 'Pending' %}
+                                        <button onclick="actionLeave('{{ leave.id }}', 'Approved')" class="btn-icon approve" title="Approve">
+                                            <i class="fa-solid fa-check"></i>
+                                        </button>
+                                        <button onclick="actionLeave('{{ leave.id }}', 'Rejected')" class="btn-icon reject" title="Reject">
+                                            <i class="fa-solid fa-xmark"></i>
+                                        </button>
+                                        {% else %}
+                                        --
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== TAB: REPORTS ========================================== -->
+        <div class="tab-content" id="tab-reports">
+            <div class="panel-card">
+                <div class="panel-header">
+                    <span class="panel-title">Download Attendance Logs</span>
+                </div>
+                
+                <div class="settings-grid" style="grid-template-columns: 1fr; max-width: 600px; margin: 0 auto; padding: 20px 0;">
+                    <div style="background: rgba(15, 23, 42, 0.4); border: 1px solid var(--border-color); padding: 25px; border-radius: var(--radius-md); text-align: center;">
+                        <i class="fa-solid fa-file-excel" style="font-size: 3.5rem; color: var(--accent-success); margin-bottom: 15px; filter: drop-shadow(0 0 10px rgba(16, 185, 129, 0.2));"></i>
+                        <h4 style="font-size: 1.25rem; margin-bottom: 8px;">Export CSV Report</h4>
+                        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px;">
+                            Select a month and year to download the complete attendance sheet. Compatible with MS Excel & Google Sheets.
+                        </p>
+                        
+                        <div class="form-group" style="display: inline-flex; gap: 15px; width: 100%; max-width: 380px; justify-content: center; margin-bottom: 20px;">
+                            <input 
+                                type="month" 
+                                id="report-month" 
+                                class="form-input" 
+                                style="padding: 10px 16px 10px 15px; max-width: 220px;"
+                                value="{{ current_month_val }}"
+                            >
+                            <button onclick="exportCSV()" class="btn" style="width: auto; padding: 10px 20px;">
+                                <i class="fa-solid fa-download" style="margin-right: 8px;"></i> Export
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== TAB: SETTINGS ========================================== -->
+        <div class="tab-content" id="tab-settings">
+            <div class="panel-card">
+                <div class="panel-header">
+                    <span class="panel-title">School Boundary & Settings</span>
+                </div>
+                
+                <form id="settings-form" onsubmit="saveSettings(event)">
+                    <div class="settings-grid">
+                        
+                        <!-- Col 1: Basic & Location -->
+                        <div>
+                            <h3 style="font-size: 1.1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-bottom: 15px; color: var(--accent-secondary);">
+                                <i class="fa-solid fa-map-location-dot"></i> Geofence Settings
+                            </h3>
+                            
+                            <div class="form-group">
+                                <label for="school-name" class="form-label">School Name</label>
+                                <input type="text" id="school-name" class="form-input" style="padding-left: 15px;" value="{{ config.school_name }}" required>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="school-lat" class="form-label">School Latitude</label>
+                                <input type="number" step="any" id="school-lat" class="form-input" style="padding-left: 15px;" value="{{ config.school_latitude }}" required>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="school-lng" class="form-label">School Longitude</label>
+                                <input type="number" step="any" id="school-lng" class="form-input" style="padding-left: 15px;" value="{{ config.school_longitude }}" required>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="allowed-radius" class="form-label">Allowed Radius (Meters)</label>
+                                <input type="number" id="allowed-radius" class="form-input" style="padding-left: 15px;" value="{{ config.allowed_radius_meters|int }}" required>
+                            </div>
+                            
+                            <button type="button" onclick="detectAdminGPS()" class="btn btn-secondary" style="font-size: 0.9rem; padding: 10px; margin-bottom: 15px;">
+                                <i class="fa-solid fa-location-crosshairs" style="margin-right: 8px;"></i> Get My Laptop coordinates
+                            </button>
+                        </div>
+                        
+                        <!-- Col 2: Timings & Secrets -->
+                        <div>
+                            <h3 style="font-size: 1.1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-bottom: 15px; color: var(--accent-secondary);">
+                                <i class="fa-solid fa-clock"></i> School Hours Config
+                            </h3>
+                            
+                            <div class="form-group">
+                                <label for="start-time" class="form-label">Check-in Open Time</label>
+                                <input type="time" id="start-time" class="form-input" style="padding-left: 15px;" value="{{ config.check_in_start_time }}" required>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="late-time" class="form-label">Late Threshold Time</label>
+                                <input type="time" id="late-time" class="form-input" style="padding-left: 15px;" value="{{ config.late_threshold_time }}" required>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="end-time" class="form-label">Check-in Close Time</label>
+                                <input type="time" id="end-time" class="form-input" style="padding-left: 15px;" value="{{ config.check_in_end_time }}" required>
+                            </div>
+
+                            <div class="form-group" style="margin-top: 20px;">
+                                <label for="qr-type" class="form-label">QR Security Mode</label>
+                                <select id="qr-type" class="form-input" style="padding-left: 15px; background-color: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary);" onchange="toggleQrSettingsView()">
+                                    <option value="dynamic" {% if config.enable_dynamic_qr %}selected{% endif %}>Dynamic QR (Screen Required, 30s auto-rotate)</option>
+                                    <option value="static" {% if not config.enable_dynamic_qr %}selected{% endif %}>Static QR (Printable, wall-mount)</option>
+                                </select>
+                            </div>
+
+                            <div id="static-qr-section" style="display: {% if config.enable_dynamic_qr %}none{% else %}block{% endif %}; margin-top: 15px; background: rgba(255,255,255,0.02); padding: 15px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); text-align: center;">
+                                <h4 style="font-size: 0.95rem; margin-bottom: 10px; color: var(--accent-secondary);">Printable Static QR Code</h4>
+                                <div id="static-qrcode-container" style="background: white; padding: 10px; display: inline-block; border-radius: var(--radius-sm); margin-bottom: 10px;"></div>
+                                <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 12px;">This QR Code points to: <br><span id="static-qr-url" style="font-family: monospace; color: var(--accent-secondary); word-break: break-all;"></span></p>
+                                <button type="button" onclick="printStaticQR()" class="btn btn-secondary" style="font-size: 0.8rem; padding: 8px 16px; width: auto;">
+                                    <i class="fa-solid fa-print"></i> Print QR Code
+                                </button>
+                            </div>
+                            
+                            <h3 style="font-size: 1.1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-top: 25px; margin-bottom: 15px; color: var(--accent-secondary);">
+                                <i class="fa-solid fa-key"></i> Cryptographic Secret
+                            </h3>
+                            
+                            <div class="form-group">
+                                <label for="totp-secret" class="form-label">Dynamic QR Base32 Secret Key</label>
+                                <div class="input-container">
+                                    <input type="text" id="totp-secret" class="form-input" style="padding-left: 15px; font-family: monospace;" value="{{ config.totp_secret }}" required readonly>
+                                    <button type="button" onclick="regenerateSecret()" class="btn btn-secondary" style="position: absolute; right: 2px; top: 2px; bottom: 2px; width: auto; padding: 0 12px; border: none; font-size: 0.8rem;">
+                                        <i class="fa-solid fa-arrows-rotate"></i> Rotate
+                                    </button>
+                                </div>
+                                <span style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-top: 5px;">
+                                    Changing this secret forces QR monitors to re-synchronize tokens.
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="border-top: 1px solid var(--border-color); padding-top: 20px; display: flex; justify-content: flex-end;">
+                        <button type="submit" class="btn" style="width: auto; padding: 12px 30px;">
+                            <i class="fa-solid fa-floppy-disk" style="margin-right: 8px;"></i> Save System Config
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+    </section>
+</div>
+
+<!-- ========================================== MODAL: ADD TEACHER ========================================== -->
+<div class="modal" id="add-teacher-modal">
+    <div class="modal-content">
+        <button class="modal-close" onclick="closeModal('add-teacher-modal')"><i class="fa-solid fa-xmark"></i></button>
+        <h3 id="teacher-modal-title" style="font-size: 1.4rem; margin-bottom: 20px;"><i class="fa-solid fa-user-plus"></i> Add New Teacher</h3>
+        
+        <form id="teacher-form" onsubmit="saveTeacher(event)">
+            <input type="hidden" id="edit-teacher-id">
+            
+            <div class="form-group">
+                <label for="teacher-name" class="form-label">Teacher Name</label>
+                <input type="text" id="teacher-name" class="form-input" style="padding-left: 15px;" placeholder="Full Name" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="teacher-code" class="form-label">Employee Code</label>
+                <input type="text" id="teacher-code" class="form-input" style="padding-left: 15px;" placeholder="6-digit unique number" required pattern="\d{6}" maxlength="6" inputmode="numeric">
+            </div>
+            
+            <div class="form-group">
+                <label for="teacher-phone" class="form-label">Phone Number (Optional)</label>
+                <input type="tel" id="teacher-phone" class="form-input" style="padding-left: 15px;" placeholder="Mobile Number">
+            </div>
+
+            <div class="form-group" id="teacher-status-group" style="display: none;">
+                <label for="teacher-active" class="form-label">Status</label>
+                <select id="teacher-active" class="form-input" style="padding-left: 15px; background-color: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary);">
+                    <option value="true">Active</option>
+                    <option value="false">Inactive</option>
+                </select>
+            </div>
+            
+            <button type="submit" class="btn" style="margin-top: 10px;">
+                <i class="fa-solid fa-check" style="margin-right: 8px;"></i> Save Record
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- ========================================== MODAL: MANUAL CHECKIN ========================================== -->
+<div class="modal" id="force-checkin-modal">
+    <div class="modal-content">
+        <button class="modal-close" onclick="closeModal('force-checkin-modal')"><i class="fa-solid fa-xmark"></i></button>
+        <h3 style="font-size: 1.4rem; margin-bottom: 20px;"><i class="fa-solid fa-user-pen"></i> Force Check-In</h3>
+        
+        <form id="force-checkin-form" onsubmit="submitForceCheckin(event)">
+            <div class="form-group">
+                <label for="force-teacher-id" class="form-label">Select Teacher</label>
+                <select id="force-teacher-id" class="form-input" style="padding-left: 15px; background-color: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary);" required>
+                    <option value="" disabled selected>-- Choose Teacher --</option>
+                    {% for teacher in teachers %}
+                    <option value="{{ teacher.id }}">{{ teacher.name }} ({{ teacher.employee_code }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="force-status" class="form-label">Check-In Status</label>
+                <select id="force-status" class="form-input" style="padding-left: 15px; background-color: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary);" required>
+                    <option value="Present" selected>Present</option>
+                    <option value="Late">Late</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="force-notes" class="form-label">Reason / Notes</label>
+                <input type="text" id="force-notes" class="form-input" style="padding-left: 15px;" placeholder="e.g. Device GPS failure, forgot code" value="Manual Override by Admin" required>
+            </div>
+            
+            <button type="submit" class="btn" style="margin-top: 10px;">
+                <i class="fa-solid fa-floppy-disk" style="margin-right: 8px;"></i> Save Override
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- ========================================== MODAL: REQUEST LEAVE ========================================== -->
+<div class="modal" id="add-leave-modal">
+    <div class="modal-content">
+        <button class="modal-close" onclick="closeModal('add-leave-modal')"><i class="fa-solid fa-xmark"></i></button>
+        <h3 style="font-size: 1.4rem; margin-bottom: 20px;"><i class="fa-solid fa-calendar-plus"></i> Record Leave Request</h3>
+        
+        <form id="leave-form" onsubmit="submitLeave(event)">
+            <div class="form-group">
+                <label for="leave-teacher-id" class="form-label">Select Teacher</label>
+                <select id="leave-teacher-id" class="form-input" style="padding-left: 15px; background-color: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary);" required>
+                    <option value="" disabled selected>-- Choose Teacher --</option>
+                    {% for teacher in teachers %}
+                    <option value="{{ teacher.id }}">{{ teacher.name }} ({{ teacher.employee_code }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="leave-type" class="form-label">Leave Type</label>
+                <select id="leave-type" class="form-input" style="padding-left: 15px; background-color: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary);" required>
+                    <option value="Casual">Casual Leave</option>
+                    <option value="Medical">Medical Leave</option>
+                    <option value="Earned">Earned Leave</option>
+                    <option value="Other">Other Leave</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="leave-start-date" class="form-label">Start Date</label>
+                <input type="date" id="leave-start-date" class="form-input" style="padding-left: 15px;" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="leave-end-date" class="form-label">End Date</label>
+                <input type="date" id="leave-end-date" class="form-input" style="padding-left: 15px;" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="leave-reason" class="form-label">Reason Details</label>
+                <input type="text" id="leave-reason" class="form-input" style="padding-left: 15px;" placeholder="Brief details about the leave request" required>
+            </div>
+            
+            <button type="submit" class="btn" style="margin-top: 10px;">
+                <i class="fa-solid fa-floppy-disk" style="margin-right: 8px;"></i> Submit Leave
+            </button>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/admin.js"></script>
+{% endblock %}

@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block title %}Teacher Check-In - VPS Attendance{% endblock %}
+
+{% block content %}
+<div class="glass-card" id="checkin-card">
+    <div class="card-header">
+        <div class="logo-icon">
+            <i class="fa-solid fa-qrcode"></i>
+        </div>
+        <h2 class="card-title">VPS Attendance</h2>
+        <p class="card-subtitle">Secure GPS & QR Check-In</p>
+    </div>
+
+    <!-- Error container for Token issues -->
+    {% if error_msg %}
+    <div class="alert alert-danger" id="token-error">
+        <i class="fa-solid fa-circle-xmark"></i>
+        <div>
+            <strong>Validation Error:</strong> {{ error_msg }}
+        </div>
+    </div>
+    <div style="text-align: center; margin-top: 10px;">
+        <p style="font-size: 0.9rem; color: var(--text-secondary);">Please scan the active QR code displayed on the school entrance screen.</p>
+    </div>
+    {% else %}
+
+    <!-- Status Alert Messages -->
+    <div id="status-alert" class="alert alert-info">
+        <i class="fa-solid fa-location-crosshairs fa-spin"></i>
+        <div id="status-text">Requesting GPS location permission...</div>
+    </div>
+
+    <!-- Form Section -->
+    <form id="checkin-form" onsubmit="submitCheckin(event)" style="display: none;">
+        <!-- Hidden input for dynamic token -->
+        <input type="hidden" id="qr-token" value="{{ token }}">
+        <input type="hidden" id="latitude" name="latitude">
+        <input type="hidden" id="longitude" name="longitude">
+        <input type="hidden" id="accuracy" name="accuracy">
+        <input type="hidden" id="device-fingerprint" name="device_fingerprint">
+
+        <div class="form-group">
+            <label for="employee-code" class="form-label">Employee Code</label>
+            <div class="input-container">
+                <i class="fa-solid fa-user-lock"></i>
+                <input 
+                    type="text" 
+                    id="employee-code" 
+                    class="form-input" 
+                    placeholder="Enter 6-digit Code" 
+                    required 
+                    pattern="\d{6}" 
+                    maxlength="6"
+                    inputmode="numeric"
+                    autocomplete="off"
+                >
+            </div>
+        </div>
+
+        <div class="geo-details-pill" id="location-pill" style="display: none;">
+            <i class="fa-solid fa-circle-check" style="color: var(--accent-success);"></i>
+            <span id="location-pill-text">GPS Coordinates Acquired</span>
+        </div>
+
+        <button type="submit" id="submit-btn" class="btn" style="margin-top: 20px;">
+            <i class="fa-solid fa-signature" style="margin-right: 8px;"></i> Mark Attendance
+        </button>
+    </form>
+
+    <!-- Success Screen (Initially Hidden) -->
+    <div id="success-screen" style="display: none; text-align: center; padding: 10px 0;">
+        <i class="fa-solid fa-circle-check" style="font-size: 4.5rem; color: var(--accent-success); margin-bottom: 20px; filter: drop-shadow(0 0 10px rgba(16, 185, 129, 0.4));"></i>
+        <h3 style="font-size: 1.6rem; font-weight: 800; margin-bottom: 8px;">Check-In Successful</h3>
+        <p id="success-name" style="font-size: 1.1rem; color: var(--text-secondary); font-weight: 600; margin-bottom: 5px;">Teacher Name</p>
+        <p id="success-time" style="font-size: 0.95rem; color: var(--text-muted); margin-bottom: 15px;">Logged at 08:15:22 AM</p>
+        
+        <div id="success-stats" class="geo-details-pill" style="margin-bottom: 25px;">
+            <i class="fa-solid fa-compass"></i>
+            <span id="success-dist-text">Distance: 12 meters</span>
+        </div>
+        
+        <button onclick="resetForm()" class="btn btn-secondary">
+            <i class="fa-solid fa-rotate-left" style="margin-right: 8px;"></i> Done
+        </button>
+    </div>
+
+    <!-- Failure Screen (Initially Hidden) -->
+    <div id="failure-screen" style="display: none; text-align: center; padding: 10px 0;">
+        <i class="fa-solid fa-circle-xmark" style="font-size: 4.5rem; color: var(--accent-danger); margin-bottom: 20px; filter: drop-shadow(0 0 10px rgba(239, 68, 68, 0.4));"></i>
+        <h3 style="font-size: 1.6rem; font-weight: 800; margin-bottom: 8px;">Check-In Failed</h3>
+        <p id="failure-reason" style="font-size: 1.05rem; color: var(--text-secondary); margin-bottom: 20px;">Reason for failure</p>
+        
+        <button onclick="retryLocation()" id="retry-btn" class="btn btn-secondary">
+            <i class="fa-solid fa-arrows-rotate" style="margin-right: 8px;"></i> Retry Check-In
+        </button>
+    </div>
+
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/main.js"></script>
+{% endblock %}

@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+
+{% block title %}Office QR Attendance Display - VPS{% endblock %}
+
+{% block extra_head %}
+<!-- Include QRCode JS library from CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+    /* Make this specific page centered without footer borders */
+    .content-wrapper {
+        min-height: 85vh;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="qr-display-container">
+    <div style="margin-bottom: 25px;">
+        <h2 style="font-size: 2.2rem; font-weight: 800; margin-bottom: 5px; background: linear-gradient(135deg, #fff 30%, var(--text-secondary) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+            {{ school_name }}
+        </h2>
+        <p style="color: var(--accent-secondary); font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; font-size: 0.9rem;">
+            Teacher Attendance Check-In Station
+        </p>
+    </div>
+
+    <!-- Digital Clock -->
+    <div class="digital-clock" id="live-clock">00:00:00</div>
+    <div id="live-date" style="color: var(--text-secondary); font-size: 1.1rem; font-weight: 500; margin-bottom: 30px;">
+        Thursday, June 11, 2026
+    </div>
+
+    <div class="qr-glow-wrapper">
+        <!-- The QR Code Element -->
+        <div id="qrcode-container" class="qr-box">
+            <!-- Rendered by QRCode.js -->
+        </div>
+        
+        <!-- Timer bar for 30s token rotation -->
+        <div class="timer-bar-container">
+            <div class="timer-bar-fill" id="timer-bar"></div>
+        </div>
+        <div class="timer-text" id="timer-label">Refreshing in 30 seconds</div>
+    </div>
+
+    <div class="qr-instructions">
+        <p style="font-size: 1.1rem; font-weight: 600; margin-bottom: 5px;">
+            <i class="fa-solid fa-mobile-screen-button" style="margin-right: 8px; color: var(--accent-primary);"></i> 
+            Scan QR with your mobile phone
+        </p>
+        <p style="font-size: 0.9rem; color: var(--text-muted);">
+            Ensure GPS/Location services are enabled. Token rotates automatically to prevent spoofing.
+        </p>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let qrGenerator = null;
+    let currentToken = "";
+    let timeRemaining = 30;
+    let totalDuration = 30; // 30 seconds TOTP window
+
+    document.addEventListener("DOMContentLoaded", () => {
+        // Init Digital Clock
+        updateClock();
+        setInterval(updateClock, 1000);
+
+        // Init QRCode instance
+        const qrContainer = document.getElementById("qrcode-container");
+        qrGenerator = new QRCode(qrContainer, {
+            text: window.location.origin + "/checkin?token=loading",
+            width: 280,
+            height: 280,
+            colorDark : "#0b0f19",
+            colorLight : "#ffffff",
+            correctLevel : QRCode.CorrectLevel.M
+        });
+
+        // Make QR Code clickable for easy local testing
+        qrContainer.style.cursor = "pointer";
+        qrContainer.title = "Click to open check-in link (for testing)";
+        qrContainer.addEventListener("click", () => {
+            if (currentToken) {
+                const checkinUrl = window.location.origin + "/checkin?token=" + currentToken;
+                window.open(checkinUrl, "_blank");
+            }
+        });
+
+        // Load token initially
+        refreshToken();
+        
+        // Start countdown interval
+        setInterval(countdownTick, 1000);
+    });
+
+    function updateClock() {
+        const now = new Date();
+        
+        // Format time
+        let hours = now.getHours();
+        let minutes = now.getMinutes();
+        let seconds = now.getSeconds();
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12;
+        hours = hours ? hours : 12; // the hour '0' should be '12'
+        minutes = minutes < 10 ? '0'+minutes : minutes;
+        seconds = seconds < 10 ? '0'+seconds : seconds;
+        
+        document.getElementById("live-clock").textContent = `${hours}:${minutes}:${seconds} ${ampm}`;
+
+        // Format date
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        document.getElementById("live-date").textContent = now.toLocaleDateString('en-US', options);
+    }
+
+    function refreshToken() {
+        fetch('/api/qr-token')
+            .then(response => response.json())
+            .then(data => {
+                currentToken = data.token;
+                timeRemaining = data.expires_in;
+                totalDuration = 30; // TOTP is 30s window
+
+                // Update QR Code content
+                const checkinUrl = window.location.origin + "/checkin?token=" + currentToken;
+                qrGenerator.clear();
+                qrGenerator.makeCode(checkinUrl);
+                
+                updateTimerUI();
+            })
+            .catch(err => {
+                console.error("Error fetching token:", err);
+                document.getElementById("timer-label").textContent = "Connection lost. Retrying...";
+            });
+    }
+
+    function countdownTick() {
+        if (timeRemaining > 0) {
+            timeRemaining--;
+            updateTimerUI();
+        } else {
+            // Token expired, refresh
+            refreshToken();
+        }
+    }
+
+    function updateTimerUI() {
+        const barFill = document.getElementById("timer-bar");
+        const label = document.getElementById("timer-label");
+        
+        // Calculate percentage
+        const pct = (timeRemaining / totalDuration) * 100;
+        barFill.style.width = pct + "%";
+        
+        // Change color to warn near expiration
+        if (timeRemaining <= 5) {
+            barFill.style.background = "linear-gradient(90deg, var(--accent-danger) 0%, #dc2626 100%)";
+            label.style.color = "var(--accent-danger)";
+        } else {
+            barFill.style.background = "linear-gradient(90deg, var(--accent-primary) 0%, var(--accent-secondary) 100%)";
+            label.style.color = "var(--text-muted)";
+        }
+        
+        label.textContent = `Refreshing in ${timeRemaining} seconds`;
+    }
+</script>
+{% endblock %}

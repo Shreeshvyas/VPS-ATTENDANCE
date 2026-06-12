@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Portal Login - VPS Attendance{% endblock %}
+
+{% block content %}
+<div class="glass-card">
+    <div class="card-header">
+        <div class="logo-icon">
+            <i class="fa-solid fa-user-shield"></i>
+        </div>
+        <h2 class="card-title">Admin Dashboard</h2>
+        <p class="card-subtitle">Please authenticate to access system logs</p>
+    </div>
+
+    {% if error %}
+    <div class="alert alert-danger">
+        <i class="fa-solid fa-circle-xmark"></i>
+        <div>{{ error }}</div>
+    </div>
+    {% endif %}
+
+    <form action="/admin/login" method="POST">
+        <div class="form-group">
+            <label for="username" class="form-label">Username</label>
+            <div class="input-container">
+                <i class="fa-solid fa-user"></i>
+                <input 
+                    type="text" 
+                    id="username" 
+                    name="username"
+                    class="form-input" 
+                    placeholder="Enter Admin Username" 
+                    required
+                    autocomplete="username"
+                >
+            </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 25px;">
+            <label for="password" class="form-label">Password</label>
+            <div class="input-container">
+                <i class="fa-solid fa-lock"></i>
+                <input 
+                    type="password" 
+                    id="password" 
+                    name="password"
+                    class="form-input" 
+                    placeholder="Enter Password" 
+                    required
+                    autocomplete="current-password"
+                >
+            </div>
+        </div>
+
+        <button type="submit" class="btn">
+            <i class="fa-solid fa-right-to-bracket" style="margin-right: 8px;"></i> Access Portal
+        </button>
+    </form>
+</div>
+{% endblock %}

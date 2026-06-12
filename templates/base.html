@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}School Attendance System{% endblock %}</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Custom Style Sheet -->
+    <link rel="stylesheet" href="/static/css/styles.css">
+    
+    <!-- PWA Support Configuration -->
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="/static/images/icon-192.png">
+    
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <div class="app-container">
+        <!-- Main Content Block -->
+        <main class="content-wrapper">
+            {% block content %}{% endblock %}
+        </main>
+        
+        <!-- Subtle Footer -->
+        <footer class="app-footer">
+            <p>&copy; 2026 VPS Attendance System. Designed for secure, instant check-in. <span class="status-indicator-dot online"></span> Secure Sandbox Active.</p>
+        </footer>
+    </div>
+
+    <!-- PWA Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('VPS PWA: Service Worker registered successfully.'))
+                    .catch(err => console.error('VPS PWA: Service Worker registration failed:', err));
+            });
+        }
+    </script>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

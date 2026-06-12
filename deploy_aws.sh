@@ -100,8 +100,9 @@ if [ -f "requirements.txt" ]; then
 fi
 pip install Django gunicorn openpyxl reportlab django-environ
 
-# Run migrations
+# Run migrations and collect static files
 python manage.py migrate
+python manage.py collectstatic --noinput
 deactivate
 
 # Setup systemd service
@@ -200,7 +201,7 @@ server {
     server_name $DOMAIN www.$DOMAIN;
 
     location /static/ {
-        alias $WEBSITE_DIR/static/;
+        alias $WEBSITE_DIR/staticfiles/;
     }
 
     location /media/ {

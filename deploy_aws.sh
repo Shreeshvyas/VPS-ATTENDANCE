@@ -21,7 +21,7 @@ sudo apt upgrade -y
 
 # 2. Install Python, PostgreSQL, Nginx, Certbot
 echo "Installing system dependencies..."
-sudo apt install -y python3-pip python3-venv python3-dev postgresql postgresql-contrib nginx certbot python3-certbot-nginx git curl
+sudo apt install -y python3-pip python3-venv python3-dev postgresql postgresql-contrib nginx certbot python3-certbot-nginx git curl libpq-dev
 
 # 3. Setup PostgreSQL database and user
 echo "Configuring PostgreSQL database..."

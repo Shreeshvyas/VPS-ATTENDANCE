@@ -33,8 +33,8 @@ class _CheckinScreenState extends State<CheckinScreen> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _codeController.text = prefs.getString('saved_employee_code') ?? '';
-      // Default to your deployed Render URL
-      _urlController.text = prefs.getString('saved_api_url') ?? 'https://vps-attendance-1.onrender.com';
+      // Default to your deployed AWS EC2 subdomain URL
+      _urlController.text = prefs.getString('saved_api_url') ?? 'https://attendance.vyaspublicschool.in';
     });
   }
 

@@ -123,6 +123,7 @@
                                 <th>Emp Code</th>
                                 <th>Teacher Name</th>
                                 <th>Check-in Time</th>
+                                <th>Check-out Time</th>
                                 <th>Distance</th>
                                 <th>Status</th>
                                 <th>Security Flag</th>
@@ -135,6 +136,7 @@
                                 <td><strong>{{ log.employee_code }}</strong></td>
                                 <td>{{ log.name }}</td>
                                 <td>{{ log.check_in_time or '--' }}</td>
+                                <td>{{ log.check_out_time or '--' }}</td>
                                 <td>
                                     {% if log.distance_meters is not none %}
                                         {{ log.distance_meters|round|int }}m
@@ -171,6 +173,72 @@
                     </table>
                 </div>
             </div>
+        </div>
+
+        <!-- Detailed Activity Stream of all clicks -->
+        <div class="panel-card" style="margin-top: 25px;">
+            <div class="panel-header" style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <span class="panel-title"><i class="fa-solid fa-clock-rotate-left" style="color: var(--accent-secondary); margin-right: 8px;"></i>Today's Detailed Activity Log</span>
+                    <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">Real-time audit log of all check-in/out clicks</div>
+                </div>
+            </div>
+            
+            {% if events %}
+            <div class="table-responsive">
+                <table class="custom-table" style="font-size: 0.9rem;">
+                    <thead>
+                        <tr>
+                            <th>Time (IST)</th>
+                            <th>Emp Code</th>
+                            <th>Teacher Name</th>
+                            <th>Action</th>
+                            <th>GPS Distance</th>
+                            <th>Device Hash</th>
+                            <th>Verification</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for event in events %}
+                        <tr>
+                            <td style="color: var(--text-muted); font-family: monospace;">{{ event.time }}</td>
+                            <td><strong>{{ event.employee_code }}</strong></td>
+                            <td>{{ event.name }}</td>
+                            <td>
+                                {% if event.event_type == 'Check-In' %}
+                                    <span class="badge" style="background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.2); color: #818cf8; padding: 4px 8px; border-radius: 4px; font-weight: 600;">
+                                        <i class="fa-solid fa-right-to-bracket" style="margin-right: 5px;"></i>Check-In
+                                    </span>
+                                {% else %}
+                                    <span class="badge" style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); color: #f87171; padding: 4px 8px; border-radius: 4px; font-weight: 600;">
+                                        <i class="fa-solid fa-right-from-bracket" style="margin-right: 5px;"></i>Clock-Out
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>{{ event.distance_meters }}m</td>
+                            <td style="font-family: monospace; font-size: 0.8rem; color: var(--text-muted);" title="Device Fingerprint Hash">{{ event.device }}</td>
+                            <td>
+                                {% if event.is_verified %}
+                                    <span class="badge badge-present" style="background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.15);">
+                                        <i class="fa-solid fa-shield-halved"></i> Verified
+                                    </span>
+                                {% else %}
+                                    <span class="badge badge-flagged" title="{{ event.verification_notes }}">
+                                        <i class="fa-solid fa-circle-exclamation"></i> Flagged
+                                    </span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div style="text-align: center; padding: 40px 20px; color: var(--text-muted);">
+                <i class="fa-solid fa-timeline" style="font-size: 2.5rem; color: rgba(255, 255, 255, 0.05); margin-bottom: 15px;"></i>
+                <p>No activity logged yet today.</p>
+            </div>
+            {% endif %}
         </div>
 
         <!-- ========================================== TAB: TEACHERS ========================================== -->

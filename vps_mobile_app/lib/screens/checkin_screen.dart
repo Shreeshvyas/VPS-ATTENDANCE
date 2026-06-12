@@ -88,7 +88,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
       if (result['success'] == true) {
         // Cache teacher code locally on successful log
         await _savePreferences();
-        _showSuccessDialog(result);
+        _showSuccessDialog(result, true);
       } else {
         _showErrorDialog(result['error'] ?? 'Check-in validation rejected.');
       }
@@ -101,7 +101,63 @@ class _CheckinScreenState extends State<CheckinScreen> {
     }
   }
 
-  void _showSuccessDialog(Map<String, dynamic> data) {
+  // Trigger Clock-Out & API submission
+  Future<void> _submitCheckout() async {
+    if (!_formKey.currentState!.validate()) return;
+    
+    setState(() {
+      _isLoading = true;
+      _statusMessage = "Acquiring GPS location coordinates...";
+      _statusColor = Colors.cyan;
+    });
+
+    try {
+      // 1. Fetch GPS location coordinates
+      final Position position = await LocationService.getCurrentLocation();
+      
+      setState(() {
+        _statusMessage = "Building device security signature...";
+        _statusColor = Colors.indigoAccent;
+      });
+
+      // 2. Fetch unique device fingerprint
+      final String deviceFingerprint = await DeviceService.getDeviceFingerprint();
+
+      setState(() {
+        _statusMessage = "Transmitting clock-out request...";
+        _statusColor = Colors.deepPurpleAccent;
+      });
+
+      // 3. Post data to FastAPI backend
+      final Map<String, dynamic> result = await ApiService.submitCheckout(
+        apiUrl: _urlController.text.trim(),
+        employeeCode: _codeController.text.trim(),
+        latitude: position.latitude,
+        longitude: position.longitude,
+        deviceFingerprint: deviceFingerprint,
+      );
+
+      setState(() {
+        _isLoading = false;
+      });
+
+      if (result['success'] == true) {
+        // Cache teacher code locally on successful log
+        await _savePreferences();
+        _showSuccessDialog(result, false);
+      } else {
+        _showErrorDialog(result['error'] ?? 'Clock-out validation rejected.');
+      }
+
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      _showErrorDialog(e.toString());
+    }
+  }
+
+  void _showSuccessDialog(Map<String, dynamic> data, bool isCheckin) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -109,12 +165,12 @@ class _CheckinScreenState extends State<CheckinScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         backgroundColor: const Color(0xFF1E293B),
         title: Column(
-          children: const [
-            Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 60),
-            SizedBox(height: 12),
+          children: [
+            const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 60),
+            const SizedBox(height: 12),
             Text(
-              'Check-In Successful',
-              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+              isCheckin ? 'Check-In Successful' : 'Clock-Out Successful',
+              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
             ),
           ],
         ),
@@ -127,8 +183,8 @@ class _CheckinScreenState extends State<CheckinScreen> {
             ),
             const SizedBox(height: 5),
             Text(
-              data['check_in_time'],
-              style: const TextStyle(fontSize: 14, color: Color(0xFF94A3B8)),
+              isCheckin ? (data['check_in_time'] ?? '--') : (data['check_out_time'] ?? '--'),
+              style: const TextStyle(fontSize: 14, color: const Color(0xFF94A3B8)),
             ),
             const SizedBox(height: 12),
             Container(
@@ -225,25 +281,18 @@ class _CheckinScreenState extends State<CheckinScreen> {
             children: [
               const SizedBox(height: 20),
               // App Logo / Icon Header
-              Container(
-                width: 90,
-                height: 90,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF6366F1), Color(0xFF06B6D4)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+              ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: Container(
+                  width: 110,
+                  height: 110,
+                  color: Colors.white,
+                  padding: const EdgeInsets.all(6),
+                  child: Image.asset(
+                    'assets/images/logo.png',
+                    fit: BoxFit.contain,
                   ),
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF6366F1).withOpacity(0.3),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
-                    )
-                  ],
                 ),
-                child: const Icon(Icons.school_rounded, size: 48, color: Colors.white),
               ),
               const SizedBox(height: 25),
               const Text(
@@ -353,7 +402,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
                             ),
                           )
                         ] else ...[
-                          ElevatedButton(
+                           ElevatedButton(
                             style: ElevatedButton.styleFrom(
                               minimumSize: const Size.fromHeight(52),
                               backgroundColor: const Color(0xFF6366F1),
@@ -368,7 +417,29 @@ class _CheckinScreenState extends State<CheckinScreen> {
                                 Icon(Icons.fingerprint_rounded),
                                 SizedBox(width: 10),
                                 Text(
-                                  'MARK ATTENDANCE',
+                                  'MARK CHECK-IN',
+                                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              minimumSize: const Size.fromHeight(52),
+                              backgroundColor: const Color(0xFFEF4444),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              elevation: 4,
+                            ),
+                            onPressed: _submitCheckout,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: const [
+                                Icon(Icons.logout_rounded),
+                                SizedBox(width: 10),
+                                Text(
+                                  'CLOCK OUT',
                                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                                 ),
                               ],

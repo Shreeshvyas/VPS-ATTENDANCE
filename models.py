@@ -24,6 +24,7 @@ class Attendance(Base):
     teacher_id = Column(Integer, ForeignKey("teachers.id"), nullable=False)
     date = Column(Date, index=True, default=datetime.date.today, nullable=False)
     check_in_time = Column(Time, nullable=True)
+    check_out_time = Column(Time, nullable=True)
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
     distance_meters = Column(Float, nullable=True)
@@ -48,6 +49,23 @@ class Leave(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     teacher = relationship("Teacher", back_populates="leaves")
+
+class AttendanceEvent(Base):
+    __tablename__ = "attendance_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    teacher_id = Column(Integer, ForeignKey("teachers.id"), nullable=False)
+    date = Column(Date, index=True, default=datetime.date.today, nullable=False)
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    event_type = Column(String, nullable=False)  # "Check-In" or "Check-Out"
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+    distance_meters = Column(Float, nullable=True)
+    device_fingerprint = Column(String, nullable=True)
+    is_verified = Column(Boolean, default=True)
+    verification_notes = Column(String, nullable=True)
+
+    teacher = relationship("Teacher")
 
 class SystemConfig(Base):
     __tablename__ = "system_config"

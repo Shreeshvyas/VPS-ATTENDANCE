@@ -21,6 +21,14 @@ models.Base.metadata.create_all(bind=engine)
 def auto_init_db():
     db = SessionLocal()
     try:
+        # 0. Run schema migrations for existing database tables
+        try:
+            db.execute("ALTER TABLE attendance ADD COLUMN check_out_time TIME")
+            db.commit()
+            print("Migration: Added check_out_time column to attendance table.")
+        except Exception:
+            db.rollback()
+
         # 1. Initialize system configuration if empty
         config = db.query(models.SystemConfig).first()
         if not config:
@@ -171,13 +179,9 @@ def api_submit_attendance(
             detail=f"Out of Bounds. You are {int(distance)}m away. Check-in allowed up to {int(config.allowed_radius_meters)}m."
         )
         
-    # 6. Check duplicates for today
+    # 6. Device Proxy check (Did other teachers check-in with this device today?)
     today = datetime.date.today()
     existing_attendance = crud.get_attendance_by_teacher_and_date(db, teacher.id, today)
-    if existing_attendance and existing_attendance.status in ["Present", "Late"]:
-         raise HTTPException(status_code=400, detail="Attendance already marked for today.")
-         
-    # 7. Device Proxy check (Did other teachers check-in with this device today?)
     today_records = crud.get_attendance_for_date(db, today)
     shared_device_count = 0
     for record in today_records:
@@ -193,12 +197,10 @@ def api_submit_attendance(
     else:
         verification_notes = "GPS and Device Verified"
         
-    # 8. Log Attendance
-    record = crud.mark_attendance(
-        db=db,
+    # 7. Log Attendance Event (Audit log of every click)
+    event_record = models.AttendanceEvent(
         teacher_id=teacher.id,
-        status=status_val,
-        check_in_time=now.time(),
+        event_type="Check-In",
         latitude=latitude,
         longitude=longitude,
         distance_meters=distance,
@@ -206,11 +208,140 @@ def api_submit_attendance(
         is_verified=is_verified,
         verification_notes=verification_notes
     )
+    db.add(event_record)
+    db.commit()
+
+    # 8. Log/Update Daily Attendance Summary
+    if existing_attendance:
+        # Keep original status if it is Present or Late, otherwise update
+        if existing_attendance.status not in ["Present", "Late"]:
+            existing_attendance.status = status_val
+        # Keep original first check_in_time
+        if existing_attendance.check_in_time is None:
+            existing_attendance.check_in_time = now.time()
+        existing_attendance.latitude = latitude
+        existing_attendance.longitude = longitude
+        existing_attendance.distance_meters = distance
+        existing_attendance.device_fingerprint = incoming_uuid
+        existing_attendance.is_verified = is_verified and existing_attendance.is_verified
+        if existing_attendance.verification_notes and "Proxy" in existing_attendance.verification_notes:
+            pass # Keep proxy warning
+        else:
+            existing_attendance.verification_notes = verification_notes
+        db.commit()
+        db.refresh(existing_attendance)
+        record = existing_attendance
+    else:
+        record = crud.mark_attendance(
+            db=db,
+            teacher_id=teacher.id,
+            status=status_val,
+            check_in_time=now.time(),
+            latitude=latitude,
+            longitude=longitude,
+            distance_meters=distance,
+            device_fingerprint=incoming_uuid,
+            is_verified=is_verified,
+            verification_notes=verification_notes
+        )
     
     return {
         "status": record.status,
         "teacher_name": teacher.name,
         "check_in_time": record.check_in_time.strftime("%I:%M:%S %p"),
+        "distance_meters": distance
+    }
+
+@app.post("/api/checkout")
+def api_submit_checkout(
+    employee_code: str = Form(...),
+    latitude: float = Form(...),
+    longitude: float = Form(...),
+    device_fingerprint: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    config = crud.get_system_config(db)
+    
+    # 1. Check Teacher
+    teacher = crud.get_teacher_by_code(db, employee_code)
+    if not teacher:
+        raise HTTPException(status_code=404, detail="Invalid Employee Code. Please verify your 6-digit number.")
+        
+    # 2. Decode & Verify Device Fingerprint
+    incoming_uuid = get_device_uuid(device_fingerprint)
+    
+    if not teacher.device_fingerprint:
+        raise HTTPException(status_code=400, detail="You must check in first to register your device.")
+    elif teacher.device_fingerprint != incoming_uuid:
+        raise HTTPException(
+            status_code=400, 
+            detail="Device Mismatch. This Employee Code is linked to another phone."
+        )
+        
+    # 3. Geofence Boundary Check
+    distance = utils.haversine_distance(
+        config.school_latitude, config.school_longitude,
+        latitude, longitude
+    )
+    
+    is_verified = True
+    notes_list = []
+    
+    if distance > config.allowed_radius_meters:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Out of Bounds. You are {int(distance)}m away. Clock-out allowed up to {int(config.allowed_radius_meters)}m."
+        )
+        
+    # 4. Check if checked in today
+    today = datetime.date.today()
+    existing_attendance = crud.get_attendance_by_teacher_and_date(db, teacher.id, today)
+    if not existing_attendance:
+         raise HTTPException(status_code=400, detail="No check-in record found for today. You must check in first.")
+         
+    # 5. Device Proxy check
+    today_records = crud.get_attendance_for_date(db, today)
+    for record in today_records:
+        if record.device_fingerprint == incoming_uuid and record.teacher_id != teacher.id:
+            other_teacher = crud.get_teacher(db, record.teacher_id)
+            if other_teacher:
+                notes_list.append(f"Proxy Alert: Same device used by {other_teacher.name} today.")
+                is_verified = False
+                
+    if not is_verified:
+        verification_notes = ", ".join(notes_list)
+    else:
+        verification_notes = "GPS and Device Verified"
+        
+    # 6. Log Clock-Out Event (Audit log of every click)
+    event_record = models.AttendanceEvent(
+        teacher_id=teacher.id,
+        event_type="Check-Out",
+        latitude=latitude,
+        longitude=longitude,
+        distance_meters=distance,
+        device_fingerprint=incoming_uuid,
+        is_verified=is_verified,
+        verification_notes=verification_notes
+    )
+    db.add(event_record)
+    db.commit()
+
+    # 7. Update Daily Attendance Summary
+    now = datetime.datetime.now()
+    existing_attendance.check_out_time = now.time()
+    existing_attendance.is_verified = is_verified and existing_attendance.is_verified
+    if existing_attendance.verification_notes and "Proxy" in existing_attendance.verification_notes:
+        pass
+    else:
+        existing_attendance.verification_notes = verification_notes
+    db.commit()
+    db.refresh(existing_attendance)
+    
+    return {
+        "status": "Checked Out",
+        "teacher_name": teacher.name,
+        "check_out_time": existing_attendance.check_out_time.strftime("%I:%M:%S %p"),
         "distance_meters": distance
     }
 
@@ -318,6 +449,7 @@ def get_admin_dashboard(request: Request, db: Session = Depends(get_db)):
         if record:
             status_val = record.status
             check_in_time = record.check_in_time.strftime("%I:%M:%S %p") if record.check_in_time else "--"
+            check_out_time = record.check_out_time.strftime("%I:%M:%S %p") if record.check_out_time else "--"
             distance_meters = record.distance_meters
             flagged = not record.is_verified
             flag_reason = record.verification_notes if flagged else ""
@@ -333,6 +465,7 @@ def get_admin_dashboard(request: Request, db: Session = Depends(get_db)):
         elif teacher.id in leave_teacher_ids:
             status_val = "On Leave"
             check_in_time = "--"
+            check_out_time = "--"
             distance_meters = None
             flagged = False
             flag_reason = ""
@@ -340,6 +473,7 @@ def get_admin_dashboard(request: Request, db: Session = Depends(get_db)):
         else:
             status_val = "Absent"
             check_in_time = "--"
+            check_out_time = "--"
             distance_meters = None
             flagged = False
             flag_reason = ""
@@ -350,6 +484,7 @@ def get_admin_dashboard(request: Request, db: Session = Depends(get_db)):
             "employee_code": teacher.employee_code,
             "name": teacher.name,
             "check_in_time": check_in_time,
+            "check_out_time": check_out_time,
             "distance_meters": distance_meters,
             "status": status_val,
             "flagged": flagged,
@@ -368,6 +503,26 @@ def get_admin_dashboard(request: Request, db: Session = Depends(get_db)):
             "end_date": leave.end_date.strftime("%Y-%m-%d"),
             "reason": leave.reason,
             "status": leave.status
+        })
+
+    # Fetch today's detailed click events (Check-In & Check-Out)
+    events_records = db.query(models.AttendanceEvent).filter(
+        models.AttendanceEvent.date == today
+    ).order_by(models.AttendanceEvent.timestamp.desc()).all()
+    events_summary = []
+    for event in events_records:
+        # Convert UTC timestamp to IST (UTC+5:30) for localized admin view
+        ist_tz = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
+        local_time = event.timestamp.replace(tzinfo=datetime.timezone.utc).astimezone(ist_tz)
+        events_summary.append({
+            "name": event.teacher.name if event.teacher else "Unknown",
+            "employee_code": event.teacher.employee_code if event.teacher else "--",
+            "time": local_time.strftime("%I:%M:%S %p"),
+            "event_type": event.event_type,
+            "distance_meters": int(event.distance_meters) if event.distance_meters is not None else 0,
+            "is_verified": event.is_verified,
+            "verification_notes": event.verification_notes or "",
+            "device": event.device_fingerprint[:8] if event.device_fingerprint else "--"
         })
 
     metrics = {
@@ -390,6 +545,7 @@ def get_admin_dashboard(request: Request, db: Session = Depends(get_db)):
         "teachers": teachers,
         "logs": logs_summary,
         "leaves": leaves_summary,
+        "events": events_summary,
         "metrics": metrics,
         "current_date": current_date,
         "current_month_val": current_month_val,
@@ -556,7 +712,7 @@ def export_attendance_csv(month: str, db: Session = Depends(get_db)):
     # Headers
     writer.writerow([
         "Date", "Employee Code", "Teacher Name", 
-        "Check-In Time", "Distance (m)", "Status", 
+        "Check-In Time", "Check-Out Time", "Distance (m)", "Status", 
         "Verified", "Verification Notes"
     ])
     
@@ -565,6 +721,7 @@ def export_attendance_csv(month: str, db: Session = Depends(get_db)):
         teacher_name = record.teacher.name if record.teacher else "Deleted Teacher"
         emp_code = record.teacher.employee_code if record.teacher else "--"
         checkin_time_str = record.check_in_time.strftime("%I:%M:%S %p") if record.check_in_time else "--"
+        checkout_time_str = record.check_out_time.strftime("%I:%M:%S %p") if record.check_out_time else "--"
         distance_str = f"{int(record.distance_meters)}m" if record.distance_meters is not None else "--"
         verified_str = "Yes" if record.is_verified else "No"
         
@@ -573,6 +730,7 @@ def export_attendance_csv(month: str, db: Session = Depends(get_db)):
             emp_code,
             teacher_name,
             checkin_time_str,
+            checkout_time_str,
             distance_str,
             record.status,
             verified_str,

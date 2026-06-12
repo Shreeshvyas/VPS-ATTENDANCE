@@ -55,4 +55,53 @@ class ApiService {
       };
     }
   }
+
+  /// Submit clock-out form parameters to the FastAPI backend API
+  static Future<Map<String, dynamic>> submitCheckout({
+    required String apiUrl,
+    required String employeeCode,
+    required double latitude,
+    required double longitude,
+    required String deviceFingerprint,
+  }) async {
+    final String baseUrl = apiUrl.endsWith('/') 
+        ? apiUrl.substring(0, apiUrl.length - 1) 
+        : apiUrl;
+    final Uri requestUri = Uri.parse('$baseUrl/api/checkout');
+
+    try {
+      final http.MultipartRequest request = http.MultipartRequest('POST', requestUri)
+        ..fields['employee_code'] = employeeCode
+        ..fields['latitude'] = latitude.toString()
+        ..fields['longitude'] = longitude.toString()
+        ..fields['device_fingerprint'] = deviceFingerprint;
+
+      final http.StreamedResponse streamedResponse = await request.send()
+          .timeout(const Duration(seconds: 15));
+      final http.Response response = await http.Response.fromStream(streamedResponse);
+
+      final Map<String, dynamic> responseData = jsonDecode(response.body);
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return {
+          "success": true,
+          "teacher_name": responseData["teacher_name"] ?? "Teacher",
+          "check_out_time": responseData["check_out_time"] ?? "--",
+          "status": responseData["status"] ?? "Checked Out",
+          "distance_meters": responseData["distance_meters"] ?? 0.0
+        };
+      } else {
+        final String errorMsg = responseData["detail"] ?? "Server validation rejected clock-out.";
+        return {
+          "success": false,
+          "error": errorMsg
+        };
+      }
+    } catch (e) {
+      return {
+        "success": false,
+        "error": "Failed to connect to school server. Please verify your internet or URL setting."
+      };
+    }
+  }
 }

@@ -154,8 +154,9 @@ def api_submit_attendance(
             detail="Device Mismatch. This Employee Code is linked to another phone. Contact Admin to reset."
         )
         
-    # 4. Check School Hours
-    now = datetime.datetime.now()
+    # 4. Check School Hours (Localized to IST UTC+5:30)
+    ist_tz = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
+    now = datetime.datetime.now(ist_tz)
     current_time_str = now.strftime("%H:%M")
     
     if current_time_str < config.check_in_start_time or current_time_str > config.check_in_end_time:
@@ -329,8 +330,9 @@ def api_submit_checkout(
     db.add(event_record)
     db.commit()
 
-    # 7. Update Daily Attendance Summary
-    now = datetime.datetime.now()
+    # 7. Update Daily Attendance Summary (Localized to IST UTC+5:30)
+    ist_tz = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
+    now = datetime.datetime.now(ist_tz)
     existing_attendance.check_out_time = now.time()
     existing_attendance.is_verified = is_verified and existing_attendance.is_verified
     if existing_attendance.verification_notes and "Proxy" in existing_attendance.verification_notes:
@@ -643,11 +645,12 @@ def api_force_attendance(data: dict, db: Session = Depends(get_db)):
     if not teacher:
          raise HTTPException(status_code=404, detail="Teacher not found.")
          
+    ist_tz = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
     crud.mark_attendance(
         db=db,
         teacher_id=teacher.id,
         status=status_val,
-        check_in_time=datetime.datetime.now().time() if status_val != "Absent" else None,
+        check_in_time=datetime.datetime.now(ist_tz).time() if status_val != "Absent" else None,
         latitude=None,
         longitude=None,
         distance_meters=None,

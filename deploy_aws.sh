@@ -21,7 +21,7 @@ sudo apt upgrade -y
 
 # 2. Install Python, PostgreSQL, Nginx, Certbot
 echo "Installing system dependencies..."
-sudo apt install -y python3-pip python3-venv python3-dev postgresql postgresql-contrib nginx certbot python3-certbot-nginx git curl libpq-dev python3.12 python3.12-venv python3.12-dev
+sudo apt install -y python3-pip python3-venv python3-dev postgresql postgresql-contrib nginx certbot python3-certbot-nginx git curl libpq-dev
 
 # 3. Setup PostgreSQL database and user
 echo "Configuring PostgreSQL database..."
@@ -36,18 +36,9 @@ sudo -i -u postgres psql -d $DB_NAME -c "GRANT ALL ON SCHEMA public TO $DB_USER;
 
 # 4. Configure Python virtual environment
 echo "Setting up Python virtual environment..."
-if command -v python3.12 &> /dev/null; then
-    PYTHON_EXE="python3.12"
-elif command -v python3.10 &> /dev/null; then
-    PYTHON_EXE="python3.10"
-else
-    PYTHON_EXE="python3"
-fi
-
-echo "Using Python: $PYTHON_EXE"
 # Clean up old virtual env if exists
 rm -rf .venv
-$PYTHON_EXE -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip
 pip install -r requirements.txt

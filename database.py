@@ -10,6 +10,10 @@ SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./attendance.db")
 if SQLALCHEMY_DATABASE_URL.startswith("postgres://"):
     SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
+# Use psycopg3 dialect for SQLAlchemy PostgreSQL connection compatibility
+if SQLALCHEMY_DATABASE_URL.startswith("postgresql://"):
+    SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgresql://", "postgresql+psycopg://", 1)
+
 # Check-same-thread arg is only valid for SQLite
 if SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
     engine = create_engine(

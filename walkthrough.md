@@ -77,3 +77,28 @@ Database seeding completed successfully!
 Below is a mockup representation of the aesthetic glassmorphic theme used for the Admin Dashboard:
 
 ![Admin Dashboard Mockup](/C:/Users/shree/.gemini/antigravity/brain/a3ed4ac2-35a5-4abf-86f2-93ac9c2f5137/admin_dashboard_mockup_1781199946510.png)
+
+---
+
+## Multi-Log Clock-Out & School Logo Integration
+
+We have completed the implementation of the Clock-Out system, multi-request activity log, and mobile app logo branding. Here is a summary of the additions:
+
+1. **Clock-Out Action**:
+   - The Flutter check-in page now displays two stacked buttons: `MARK CHECK-IN` and `CLOCK OUT`.
+   - Clock-Out verifies the teacher's GPS geofence (radius <= 100m) and matches their bound device fingerprint.
+   - Successful clock-out updates the daily attendance summary record with `check_out_time`.
+
+2. **Detailed Activity Stream (Multi-Log Audit)**:
+   - Added `AttendanceEvent` to the database schema.
+   - Every single check-in and clock-out request is recorded as a separate event, tracking the timestamp (stored in UTC, converted to IST local time for the admin), coordinates, distance, and device.
+   - Allows teachers to clock in/out multiple times a day while maintaining the daily summary record (keeping the first check-in and last clock-out times intact).
+   - Added a **"Today's Detailed Activity Log"** timeline panel to the Admin Dashboard to let the admin view every single request log dynamically.
+
+3. **Branded Mobile App Interface**:
+   - Registered the uploaded school logo in the Flutter project (`assets/images/logo.png`).
+   - Replaced the generic app icon with the Vyas Public Higher Secondary School logo at the top of the mobile check-in/out form.
+
+4. **Zero-Setup Database Migrations**:
+   - Configured the FastAPI server to run automatic schema alterations on start. Connecting a new database (like PostgreSQL on Render) automatically builds the columns and tables on boot, ready to log in immediately.
+

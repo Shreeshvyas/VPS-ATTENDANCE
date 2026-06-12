@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:device_info_plus/device_info_plus';
+import 'package:device_info_plus/device_info_plus.dart';
 
 class DeviceService {
   /// Fetch a unique persistent hardware ID and package it as base64 JSON

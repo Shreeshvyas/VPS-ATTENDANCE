@@ -52,7 +52,7 @@ EOF
 
 # 6. Setup FastAPI Systemd background service
 echo "Creating systemd service configuration..."
-sudo bash -c "cat << EOF > /etc/systemd/system/vps-attendance.service
+cat << EOF | sudo tee /etc/systemd/system/vps-attendance.service > /dev/null
 [Unit]
 Description=FastAPI VPS Attendance Application
 After=network.target
@@ -67,7 +67,7 @@ EnvironmentFile=$(pwd)/.env
 
 [Install]
 WantedBy=multi-user.target
-EOF"
+EOF
 
 # Enable and start the service
 echo "Starting FastAPI background service..."
@@ -77,7 +77,7 @@ sudo systemctl restart vps-attendance.service
 
 # 7. Configure Nginx reverse proxy
 echo "Configuring Nginx Reverse Proxy..."
-sudo bash -c "cat << EOF > /etc/nginx/sites-available/vps-attendance
+cat << EOF | sudo tee /etc/nginx/sites-available/vps-attendance > /dev/null
 server {
     listen 80;
     server_name $DOMAIN www.$DOMAIN;
@@ -90,7 +90,7 @@ server {
         proxy_set_header X-Forwarded-Proto \$scheme;
     }
 }
-EOF"
+EOF
 
 # Enable Nginx config and disable default
 sudo ln -sf /etc/nginx/sites-available/vps-attendance /etc/nginx/sites-enabled/

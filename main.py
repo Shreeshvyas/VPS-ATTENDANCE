@@ -23,10 +23,12 @@ def auto_init_db():
     try:
         # 0. Run schema migrations for existing database tables
         try:
-            db.execute("ALTER TABLE attendance ADD COLUMN check_out_time TIME")
+            from sqlalchemy import text
+            db.execute(text("ALTER TABLE attendance ADD COLUMN check_out_time TIME"))
             db.commit()
             print("Migration: Added check_out_time column to attendance table.")
-        except Exception:
+        except Exception as e:
+            print(f"Migration note: {e}")
             db.rollback()
 
         # 1. Initialize system configuration if empty

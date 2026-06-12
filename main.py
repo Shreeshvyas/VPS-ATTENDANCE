@@ -13,10 +13,43 @@ from io import StringIO
 import models
 import crud
 import utils
-from database import engine, get_db
+from database import engine, get_db, SessionLocal
 
 # Create database tables
 models.Base.metadata.create_all(bind=engine)
+
+def auto_init_db():
+    db = SessionLocal()
+    try:
+        # 1. Initialize system configuration if empty
+        config = db.query(models.SystemConfig).first()
+        if not config:
+            config = models.SystemConfig(
+                school_name="VPS High School",
+                school_latitude=24.12345,
+                school_longitude=77.12345,
+                allowed_radius_meters=100.0,
+                check_in_start_time="07:30",
+                late_threshold_time="08:30",
+                check_in_end_time="10:00",
+                totp_secret="JBSWY3DPEHPK3PXP",
+                enable_dynamic_qr=False
+            )
+            db.add(config)
+            db.commit()
+            print("Auto-Init: Default system config created.")
+            
+        # 2. Initialize default admin if empty
+        admin = db.query(models.Admin).filter(models.Admin.username == "admin").first()
+        if not admin:
+            crud.create_admin(db, "admin", "adminpassword")
+            print("Auto-Init: Default admin created (admin/adminpassword).")
+    except Exception as e:
+        print(f"Auto-Init Error: {e}")
+    finally:
+        db.close()
+
+auto_init_db()
 
 app = FastAPI(title="VPS Attendance System")
 

@@ -69,7 +69,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
 
       setState(() {
         _statusMessage = "Transmitting to school server...";
-        _statusColor = Colors.violetAccent;
+        _statusColor = Colors.deepPurpleAccent;
       });
 
       // 3. Post data to FastAPI backend

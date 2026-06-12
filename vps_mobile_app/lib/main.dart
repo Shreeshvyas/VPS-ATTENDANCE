@@ -26,7 +26,7 @@ class VpsAttendanceApp extends StatelessWidget {
           onPrimary: Colors.white,
         ),
         fontFamily: 'Outfit',
-        cardTheme: CardTheme(
+        cardTheme: CardThemeData(
           color: const Color(0xFF1E293B).withOpacity(0.8),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),

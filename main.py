@@ -177,6 +177,20 @@ def api_submit_attendance(
     notes_list = []
     
     if distance > config.allowed_radius_meters:
+        # Log failed attempt before throwing exception
+        event_record = models.AttendanceEvent(
+            teacher_id=teacher.id,
+            event_type="Check-In",
+            latitude=latitude,
+            longitude=longitude,
+            distance_meters=distance,
+            device_fingerprint=incoming_uuid,
+            is_verified=False,
+            verification_notes=f"Out of Bounds: {int(distance)}m away"
+        )
+        db.add(event_record)
+        db.commit()
+        
         raise HTTPException(
             status_code=400, 
             detail=f"Out of Bounds. You are {int(distance)}m away. Check-in allowed up to {int(config.allowed_radius_meters)}m."
@@ -291,6 +305,20 @@ def api_submit_checkout(
     notes_list = []
     
     if distance > config.allowed_radius_meters:
+        # Log failed attempt before throwing exception
+        event_record = models.AttendanceEvent(
+            teacher_id=teacher.id,
+            event_type="Check-Out",
+            latitude=latitude,
+            longitude=longitude,
+            distance_meters=distance,
+            device_fingerprint=incoming_uuid,
+            is_verified=False,
+            verification_notes=f"Out of Bounds: {int(distance)}m away"
+        )
+        db.add(event_record)
+        db.commit()
+        
         raise HTTPException(
             status_code=400, 
             detail=f"Out of Bounds. You are {int(distance)}m away. Clock-out allowed up to {int(config.allowed_radius_meters)}m."

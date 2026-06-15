@@ -524,6 +524,8 @@ def get_admin_dashboard(request: Request, db: Session = Depends(get_db)):
             "time": local_time.strftime("%I:%M:%S %p"),
             "event_type": event.event_type,
             "distance_meters": int(event.distance_meters) if event.distance_meters is not None else 0,
+            "latitude": f"{event.latitude:.6f}" if event.latitude is not None else None,
+            "longitude": f"{event.longitude:.6f}" if event.longitude is not None else None,
             "is_verified": event.is_verified,
             "verification_notes": event.verification_notes or "",
             "device": event.device_fingerprint[:8] if event.device_fingerprint else "--"

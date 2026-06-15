@@ -215,7 +215,14 @@
                                     </span>
                                 {% endif %}
                             </td>
-                            <td>{{ event.distance_meters }}m</td>
+                             <td>
+                                 <strong>{{ event.distance_meters }}m</strong>
+                                 {% if event.latitude and event.longitude %}
+                                     <div style="font-size: 0.72rem; color: var(--text-muted); font-family: monospace; margin-top: 3px;" title="Coordinates sent by teacher's phone">
+                                         {{ event.latitude }}, {{ event.longitude }}
+                                     </div>
+                                 {% endif %}
+                             </td>
                             <td style="font-family: monospace; font-size: 0.8rem; color: var(--text-muted);" title="Device Fingerprint Hash">{{ event.device }}</td>
                             <td>
                                 {% if event.is_verified %}

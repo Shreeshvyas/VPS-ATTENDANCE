@@ -6,6 +6,7 @@
 #  1. vyaspublicschool.in -> Django School Website (Port 8001)
 #  2. portal.vyaspublicschool.in -> Django School ERP (Port 8002)
 #  3. attendance.vyaspublicschool.in -> FastAPI Attendance (Port 8000)
+#  4. teacher.vyaspublicschool.in -> Django Teacher Portal (Port 8003)
 
 set -e
 
@@ -176,6 +177,53 @@ WantedBy=multi-user.target
 EOF
 
 # --------------------------------------------------------
+# APP 4: Django Teacher Portal (Port 8003)
+# --------------------------------------------------------
+echo ">>> Setting up Django Teacher Portal (Port 8003)..."
+TEACHER_DIR="/home/ubuntu/VPHS-TEACHERS-PORTAL"
+TEACHER_BACKEND_DIR="$TEACHER_DIR/backend"
+
+# Clone if directory doesn't exist
+if [ ! -d "$TEACHER_DIR" ]; then
+    git clone https://github.com/Shreeshvyas/VPHS-TEACHERS-PORTAL.git $TEACHER_DIR
+else
+    cd $TEACHER_DIR && git pull origin master
+fi
+
+cd $TEACHER_BACKEND_DIR
+rm -rf .venv
+python3 -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
+# Install requirements and gunicorn
+if [ -f "requirements.txt" ]; then
+    pip install -r requirements.txt
+fi
+pip install gunicorn
+
+# Run migrations & collect static files
+python manage.py migrate
+python manage.py collectstatic --noinput
+deactivate
+
+# Setup systemd service
+cat << EOF | sudo tee /etc/systemd/system/vps-teacher.service > /dev/null
+[Unit]
+Description=Django VPS Teacher Portal Application
+After=network.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=$TEACHER_BACKEND_DIR
+ExecStart=$TEACHER_BACKEND_DIR/.venv/bin/gunicorn teacher_portal.wsgi:application --bind 127.0.0.1:8003 --workers 2
+Restart=always
+Environment=PATH=$TEACHER_BACKEND_DIR/.venv/bin:/usr/bin:/usr/local/bin
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# --------------------------------------------------------
 # SYSTEMD SERVICES ACTIVATION
 # --------------------------------------------------------
 echo "Activating Background Services..."
@@ -190,6 +238,9 @@ sudo systemctl restart vps-website.service
 sudo systemctl enable vps-portal.service
 sudo systemctl restart vps-portal.service
 
+sudo systemctl enable vps-teacher.service
+sudo systemctl restart vps-teacher.service
+
 # --------------------------------------------------------
 # NGINX CONFIGURATION
 # --------------------------------------------------------
@@ -198,14 +249,14 @@ cat << EOF | sudo tee /etc/nginx/sites-available/vps-attendance > /dev/null
 # 1. School Main Website (Port 8001)
 server {
     listen 80;
-    server_name $DOMAIN www.$DOMAIN;
+    server_name \$DOMAIN www.\$DOMAIN;
 
     location /static/ {
-        alias $WEBSITE_DIR/staticfiles/;
+        alias \$WEBSITE_DIR/staticfiles/;
     }
 
     location /media/ {
-        alias $WEBSITE_DIR/media/;
+        alias \$WEBSITE_DIR/media/;
     }
 
     location / {
@@ -220,10 +271,10 @@ server {
 # 2. Teacher Attendance (Port 8000)
 server {
     listen 80;
-    server_name attendance.$DOMAIN;
+    server_name attendance.\$DOMAIN;
 
     location /static/ {
-        alias $ATTENDANCE_DIR/static/;
+        alias \$ATTENDANCE_DIR/static/;
     }
 
     location / {
@@ -238,18 +289,40 @@ server {
 # 3. ERP School Portal (Port 8002)
 server {
     listen 80;
-    server_name portal.$DOMAIN;
+    server_name portal.\$DOMAIN;
 
     location /static/ {
-        alias $PORTAL_DIR/staticfiles/;
+        alias \$PORTAL_DIR/staticfiles/;
     }
 
     location /media/ {
-        alias $PORTAL_DIR/media/;
+        alias \$PORTAL_DIR/media/;
     }
 
     location / {
         proxy_pass http://127.0.0.1:8002;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+
+# 4. Django Teacher Portal (Port 8003)
+server {
+    listen 80;
+    server_name teacher.\$DOMAIN;
+
+    location /static/ {
+        alias \$TEACHER_BACKEND_DIR/staticfiles/;
+    }
+
+    location /media/ {
+        alias \$TEACHER_BACKEND_DIR/media/;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:8003;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
@@ -270,11 +343,12 @@ echo "========================================================"
 echo "Deployment and configuration completed successfully!"
 echo "========================================================"
 echo "Ensure DNS A Records exist for:"
-echo " - $DOMAIN"
-echo " - www.$DOMAIN"
-echo " - attendance.$DOMAIN"
-echo " - portal.$DOMAIN"
+echo " - \$DOMAIN"
+echo " - www.\$DOMAIN"
+echo " - attendance.\$DOMAIN"
+echo " - portal.\$DOMAIN"
+echo " - teacher.\$DOMAIN"
 echo ""
 echo "Then generate SSL for all subdomains by running:"
-echo "sudo certbot --nginx -d $DOMAIN -d www.$DOMAIN -d attendance.$DOMAIN -d portal.$DOMAIN"
+echo "sudo certbot --nginx -d \$DOMAIN -d www.\$DOMAIN -d attendance.\$DOMAIN -d portal.\$DOMAIN -d teacher.\$DOMAIN"
 echo "========================================================"

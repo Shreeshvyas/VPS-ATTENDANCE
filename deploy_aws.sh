@@ -250,6 +250,7 @@ cat << EOF | sudo tee /etc/nginx/sites-available/vps-attendance > /dev/null
 server {
     listen 80;
     server_name \$DOMAIN www.\$DOMAIN;
+    client_max_body_size 100M;
 
     location /static/ {
         alias \$WEBSITE_DIR/staticfiles/;
@@ -272,6 +273,7 @@ server {
 server {
     listen 80;
     server_name attendance.\$DOMAIN;
+    client_max_body_size 100M;
 
     location /static/ {
         alias \$ATTENDANCE_DIR/static/;
@@ -290,6 +292,7 @@ server {
 server {
     listen 80;
     server_name portal.\$DOMAIN;
+    client_max_body_size 100M;
 
     location /static/ {
         alias \$PORTAL_DIR/staticfiles/;
@@ -312,6 +315,7 @@ server {
 server {
     listen 80;
     server_name teacher.\$DOMAIN;
+    client_max_body_size 100M;
 
     location /static/ {
         alias \$TEACHER_BACKEND_DIR/staticfiles/;

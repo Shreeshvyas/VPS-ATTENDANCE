@@ -34,7 +34,11 @@ class _CheckinScreenState extends State<CheckinScreen> {
     setState(() {
       _codeController.text = prefs.getString('saved_employee_code') ?? '';
       // Default to your deployed AWS EC2 subdomain URL
-      _urlController.text = prefs.getString('saved_api_url') ?? 'https://attendance.vyaspublicschool.in';
+      String? savedUrl = prefs.getString('saved_api_url');
+      if (savedUrl == null || savedUrl.contains('onrender.com') || savedUrl.contains('render.com')) {
+        savedUrl = 'https://attendance.vyaspublicschool.in';
+      }
+      _urlController.text = savedUrl;
     });
   }
 

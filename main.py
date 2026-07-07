@@ -777,3 +777,127 @@ def export_attendance_csv(month: str, db: Session = Depends(get_db)):
     response = StreamingResponse(iter([response_data]), media_type="text/csv")
     response.headers["Content-Disposition"] = f"attachment; filename=VPS_Attendance_{month}.csv"
     return response
+
+# API Endpoint for historical filtered attendance records
+@app.get("/api/admin/history", dependencies=[Depends(verify_admin_api)])
+def api_get_attendance_history(
+    month: str = None,
+    date: str = None,
+    teacher_id: int = None,
+    status: str = None,
+    db: Session = Depends(get_db)
+):
+    query = db.query(models.Attendance)
+    
+    if date:
+        try:
+            parsed_date = datetime.datetime.strptime(date, "%Y-%m-%d").date()
+            query = query.filter(models.Attendance.date == parsed_date)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format. Expected YYYY-MM-DD.")
+    elif month:
+        try:
+            year, mon = map(int, month.split("-"))
+            query = query.filter(
+                models.Attendance.date >= datetime.date(year, mon, 1),
+                models.Attendance.date <= (datetime.date(year, mon, 1) + datetime.timedelta(days=32)).replace(day=1) - datetime.timedelta(days=1)
+            )
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid month format. Expected YYYY-MM.")
+            
+    if teacher_id:
+        query = query.filter(models.Attendance.teacher_id == teacher_id)
+        
+    if status:
+        query = query.filter(models.Attendance.status == status)
+        
+    records = query.order_by(models.Attendance.date.desc(), models.Attendance.check_in_time.desc()).all()
+    
+    result = []
+    for r in records:
+        result.append({
+            "date": r.date.strftime("%Y-%m-%d"),
+            "employee_code": r.teacher.employee_code if r.teacher else "--",
+            "name": r.teacher.name if r.teacher else "Deleted Teacher",
+            "check_in_time": r.check_in_time.strftime("%I:%M:%S %p") if r.check_in_time else "--",
+            "check_out_time": r.check_out_time.strftime("%I:%M:%S %p") if r.check_out_time else "--",
+            "distance_meters": int(r.distance_meters) if r.distance_meters is not None else "--",
+            "latitude": r.latitude,
+            "longitude": r.longitude,
+            "status": r.status,
+            "is_verified": r.is_verified,
+            "verification_notes": r.verification_notes or ""
+        })
+    return result
+
+# CSV Attendance Export for historical filtered records
+@app.get("/admin/export/history/csv", dependencies=[Depends(verify_admin_api)])
+def export_filtered_attendance_csv(
+    month: str = None,
+    date: str = None,
+    teacher_id: int = None,
+    status: str = None,
+    db: Session = Depends(get_db)
+):
+    query = db.query(models.Attendance)
+    
+    if date:
+        try:
+            parsed_date = datetime.datetime.strptime(date, "%Y-%m-%d").date()
+            query = query.filter(models.Attendance.date == parsed_date)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format. Expected YYYY-MM-DD.")
+    elif month:
+        try:
+            year, mon = map(int, month.split("-"))
+            query = query.filter(
+                models.Attendance.date >= datetime.date(year, mon, 1),
+                models.Attendance.date <= (datetime.date(year, mon, 1) + datetime.timedelta(days=32)).replace(day=1) - datetime.timedelta(days=1)
+            )
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid month format. Expected YYYY-MM.")
+            
+    if teacher_id:
+        query = query.filter(models.Attendance.teacher_id == teacher_id)
+        
+    if status:
+        query = query.filter(models.Attendance.status == status)
+        
+    records = query.order_by(models.Attendance.date.desc(), models.Attendance.check_in_time.desc()).all()
+    
+    # Create CSV memory buffer
+    stream = StringIO()
+    stream.write('\ufeff')  # BOM for Excel
+    writer = csv.writer(stream)
+    
+    writer.writerow([
+        "Date", "Employee Code", "Teacher Name", 
+        "Check-In Time", "Check-Out Time", "Distance (m)", "Status", 
+        "Verified", "Verification Notes"
+    ])
+    
+    for r in records:
+        teacher_name = r.teacher.name if r.teacher else "Deleted Teacher"
+        emp_code = r.teacher.employee_code if r.teacher else "--"
+        checkin_time_str = r.check_in_time.strftime("%I:%M:%S %p") if r.check_in_time else "--"
+        checkout_time_str = r.check_out_time.strftime("%I:%M:%S %p") if r.check_out_time else "--"
+        distance_str = f"{int(r.distance_meters)}m" if r.distance_meters is not None else "--"
+        verified_str = "Yes" if r.is_verified else "No"
+        
+        writer.writerow([
+            r.date.strftime("%Y-%m-%d"),
+            emp_code,
+            teacher_name,
+            checkin_time_str,
+            checkout_time_str,
+            distance_str,
+            r.status,
+            verified_str,
+            r.verification_notes or ""
+        ])
+        
+    response_data = stream.getvalue()
+    filename_suffix = date if date else (month if month else "all")
+    response = StreamingResponse(iter([response_data]), media_type="text/csv")
+    response.headers["Content-Disposition"] = f"attachment; filename=VPS_Attendance_History_{filename_suffix}.csv"
+    return response

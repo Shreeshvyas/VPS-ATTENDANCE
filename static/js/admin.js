@@ -26,6 +26,11 @@ function switchTab(tabId) {
             pageTitle.textContent = "Today's Attendance";
             pageSubtitle.textContent = `Real-time activity logs`;
             break;
+        case 'history':
+            pageTitle.textContent = "Attendance History";
+            pageSubtitle.textContent = "Search and download complete date/month-wise logs";
+            loadHistoryRecords();
+            break;
         case 'teachers':
             pageTitle.textContent = "Teachers Directory";
             pageSubtitle.textContent = "Manage staff profiles and device bindings";
@@ -431,4 +436,97 @@ document.addEventListener('DOMContentLoaded', () => {
             toggleQrSettingsView();
         }
     }, 500);
+
+    // Set default month in filter input (current month)
+    const today = new Date();
+    const currentMonth = today.toISOString().slice(0, 7); // "YYYY-MM"
+    const monthInput = document.getElementById('filter-history-month');
+    if (monthInput) {
+        monthInput.value = currentMonth;
+    }
 });
+
+// ==========================================
+// HISTORICAL LOGS (ALL RECORDS) FUNCTIONS
+// ==========================================
+
+function loadHistoryRecords() {
+    const month = document.getElementById('filter-history-month').value;
+    const date = document.getElementById('filter-history-date').value;
+    const teacherId = document.getElementById('filter-history-teacher').value;
+    const status = document.getElementById('filter-history-status').value;
+    
+    // Build query params
+    let url = `/api/admin/history?`;
+    if (month) url += `month=${month}&`;
+    if (date) url += `date=${date}&`;
+    if (teacherId) url += `teacher_id=${teacherId}&`;
+    if (status) url += `status=${status}&`;
+    
+    const tbody = document.getElementById('history-table-body');
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 20px;"><i class="fa-solid fa-spinner fa-spin"></i> Loading historical records...</td></tr>`;
+    
+    fetch(url)
+    .then(async res => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Failed to load history.");
+        return data;
+    })
+    .then(records => {
+        if (records.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 30px; color: var(--text-muted);"><i class="fa-solid fa-circle-info"></i> No historical records match your filter criteria.</td></tr>`;
+            return;
+        }
+        
+        let html = '';
+        records.forEach(r => {
+            const statusClass = r.status.toLowerCase();
+            const verificationHtml = r.is_verified 
+                ? `<span class="badge badge-present" style="background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.15);"><i class="fa-solid fa-shield-halved"></i> Verified</span>`
+                : `<span class="badge badge-flagged" title="${r.verification_notes}"><i class="fa-solid fa-circle-exclamation"></i> Flagged</span>`;
+                
+            html += `
+                <tr>
+                    <td style="color: var(--text-muted); font-family: monospace;">${r.date}</td>
+                    <td><strong>${r.employee_code}</strong></td>
+                    <td>${r.name}</td>
+                    <td>${r.check_in_time}</td>
+                    <td>${r.check_out_time}</td>
+                    <td>
+                        <strong>${r.distance_meters !== '--' ? r.distance_meters + 'm' : '--'}</strong>
+                        ${r.latitude && r.longitude ? `<div style="font-size: 0.72rem; color: var(--text-muted); font-family: monospace; margin-top: 3px;" title="Coordinates">${r.latitude}, ${r.longitude}</div>` : ''}
+                    </td>
+                    <td><span class="badge badge-${statusClass}">${r.status}</span></td>
+                    <td>${verificationHtml}</td>
+                </tr>
+            `;
+        });
+        tbody.innerHTML = html;
+    })
+    .catch(err => {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 20px; color: var(--accent-danger);"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message}</td></tr>`;
+    });
+}
+
+function resetHistoryFilters() {
+    document.getElementById('filter-history-month').value = '';
+    document.getElementById('filter-history-date').value = '';
+    document.getElementById('filter-history-teacher').value = '';
+    document.getElementById('filter-history-status').value = '';
+    loadHistoryRecords();
+}
+
+function downloadHistoryCSV() {
+    const month = document.getElementById('filter-history-month').value;
+    const date = document.getElementById('filter-history-date').value;
+    const teacherId = document.getElementById('filter-history-teacher').value;
+    const status = document.getElementById('filter-history-status').value;
+    
+    let url = `/admin/export/history/csv?`;
+    if (month) url += `month=${month}&`;
+    if (date) url += `date=${date}&`;
+    if (teacherId) url += `teacher_id=${teacherId}&`;
+    if (status) url += `status=${status}&`;
+    
+    window.location.href = url;
+}

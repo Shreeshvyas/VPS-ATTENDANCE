@@ -29,10 +29,12 @@
                 <span>Administrator</span>
             </div>
         </div>
-        
         <ul class="sidebar-menu">
             <li class="menu-item active" id="menu-logs" onclick="switchTab('logs')">
                 <button><i class="fa-solid fa-list-check"></i> Today's Logs</button>
+            </li>
+            <li class="menu-item" id="menu-history" onclick="switchTab('history')">
+                <button><i class="fa-solid fa-calendar-days"></i> All Records</button>
             </li>
             <li class="menu-item" id="menu-teachers" onclick="switchTab('teachers')">
                 <button><i class="fa-solid fa-chalkboard-user"></i> Teachers Directory</button>
@@ -169,6 +171,88 @@
                                 </td>
                             </tr>
                             {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== TAB: HISTORY ========================================== -->
+        <div class="tab-content" id="tab-history">
+            <div class="panel-card">
+                <div class="panel-header" style="flex-wrap: wrap; gap: 15px;">
+                    <span class="panel-title">All Historical Attendance Records</span>
+                    <button onclick="downloadHistoryCSV()" class="btn btn-secondary" style="width: auto; padding: 6px 12px; font-size: 0.85rem; background-color: var(--accent-success); display: inline-flex; align-items: center; gap: 6px;">
+                        <i class="fa-solid fa-file-csv"></i> Download CSV
+                    </button>
+                </div>
+                
+                <!-- Filters Grid -->
+                <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 15px; margin-bottom: 20px;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; align-items: flex-end;">
+                        
+                        <!-- Month Filter -->
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label" style="margin-bottom: 5px;">Filter by Month</label>
+                            <input type="month" id="filter-history-month" class="form-input" style="padding: 8px 12px; height: 38px; background-color: var(--card-bg); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px;" onchange="document.getElementById('filter-history-date').value=''; loadHistoryRecords()">
+                        </div>
+                        
+                        <!-- Date Filter -->
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label" style="margin-bottom: 5px;">Filter by Single Date</label>
+                            <input type="date" id="filter-history-date" class="form-input" style="padding: 8px 12px; height: 38px; background-color: var(--card-bg); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px;" onchange="document.getElementById('filter-history-month').value=''; loadHistoryRecords()">
+                        </div>
+                        
+                        <!-- Teacher Filter -->
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label" style="margin-bottom: 5px;">Filter by Teacher</label>
+                            <select id="filter-history-teacher" class="form-input" style="padding: 8px 12px; height: 38px; background-color: var(--card-bg); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px;" onchange="loadHistoryRecords()">
+                                <option value="">All Teachers</option>
+                                {% for teacher in teachers %}
+                                    <option value="{{ teacher.id }}">{{ teacher.name }} ({{ teacher.employee_code }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <!-- Status Filter -->
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label" style="margin-bottom: 5px;">Filter by Status</label>
+                            <select id="filter-history-status" class="form-input" style="padding: 8px 12px; height: 38px; background-color: var(--card-bg); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px;" onchange="loadHistoryRecords()">
+                                <option value="">All Statuses</option>
+                                <option value="Present">Present</option>
+                                <option value="Late">Late</option>
+                                <option value="Absent">Absent</option>
+                                <option value="On Leave">On Leave</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Reset Button -->
+                        <div>
+                            <button onclick="resetHistoryFilters()" class="btn btn-outline" style="height: 38px; width: 100%; display: inline-flex; align-items: center; justify-content: center; padding: 0 15px; border: 1px solid var(--border-color); background: transparent; color: var(--text-main); border-radius: 4px; cursor: pointer;">
+                                <i class="fa-solid fa-arrow-rotate-left" style="margin-right: 6px;"></i> Reset
+                            </button>
+                        </div>
+                        
+                    </div>
+                </div>
+                
+                <!-- Table View -->
+                <div class="table-responsive">
+                    <table class="custom-table" style="font-size: 0.9rem;">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Emp Code</th>
+                                <th>Teacher Name</th>
+                                <th>Check-In</th>
+                                <th>Check-Out</th>
+                                <th>Distance</th>
+                                <th>Status</th>
+                                <th>Verification</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-table-body">
+                            <!-- Populated dynamically via JS -->
                         </tbody>
                     </table>
                 </div>

@@ -34,9 +34,9 @@ def delete_teacher(db: Session, teacher_id: int):
     db_teacher = get_teacher(db, teacher_id)
     if db_teacher:
         # Instead of deleting, we can deactivate them, but actual deletion of records is fine if needed
-        # Let's delete attendance & leaves as well to prevent foreign key issues, or just delete the teacher
         db.query(models.Attendance).filter(models.Attendance.teacher_id == teacher_id).delete()
         db.query(models.Leave).filter(models.Leave.teacher_id == teacher_id).delete()
+        db.query(models.AttendanceEvent).filter(models.AttendanceEvent.teacher_id == teacher_id).delete()
         db.delete(db_teacher)
         db.commit()
         return True
